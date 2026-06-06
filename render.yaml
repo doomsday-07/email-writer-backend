@@ -21,8 +21,6 @@ services:
         value: org.hibernate.dialect.PostgreSQLDialect
       - key: GEMINI_API_URL
         sync: false
-      - key: GEMINI_API_KEY
-        sync: false
       - key: GOOGLE_OAUTH_CLIENT_ID
         sync: false
       - key: GOOGLE_OAUTH_CLIENT_SECRET
