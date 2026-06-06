@@ -1,76 +1,69 @@
 package com.email.writer;
 
-import tools.jackson.databind.node.ObjectNode;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.core.JacksonException;
+import com.email.writer.auth.GmailApiService;
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Service
+@Slf4j
 public class EmailGeneratorService {
 
     private final WebClient webClient;
     private final String apiKey;
     private final ObjectMapper objectMapper;
-    private final JavaMailSender mailSender;
-    private final String mailFrom;
+    private final GmailApiService gmailApiService;
 
     public EmailGeneratorService(@Value("${gemini.api.url}") String baseUrl,
                                  @Value("${gemini.api.key}") String geminiApiKey,
-                                 JavaMailSender mailSender,
-                                 @Value("${spring.mail.username}") String mailFrom) {
+                                 GmailApiService gmailApiService) {
         this.apiKey = geminiApiKey;
         this.webClient = WebClient.create(baseUrl);
         this.objectMapper = new ObjectMapper();
-        this.mailSender = mailSender;
-        this.mailFrom = mailFrom;
+        this.gmailApiService = gmailApiService;
     }
 
-    public String generateEmailReply(EmailRequest emailRequest) {
+    public String generateEmailReply(EmailRequest emailRequest, String authenticatedUser) {
+        log.debug("generateEmailReply user={} tone={} contentLen={}",
+                authenticatedUser,
+                emailRequest.getTone(),
+                emailRequest.getEmailContent() != null ? emailRequest.getEmailContent().length() : 0);
         String prompt = buildReplyPrompt(emailRequest);
         return callGemini(prompt);
     }
 
-    public String translateEmail(EmailRequest emailRequest) {
+    public String translateEmail(EmailRequest emailRequest, String authenticatedUser) {
         String targetLanguage = emailRequest.getTargetLanguage();
         if (targetLanguage == null || targetLanguage.isBlank()) {
             throw new IllegalArgumentException("targetLanguage is required for translations.");
         }
-
         String sourceLanguage = emailRequest.getSourceLanguage();
         String emailContent = emailRequest.getEmailContent();
-        
-        System.out.println("Translation Request - Content length: " + (emailContent != null ? emailContent.length() : 0) + 
-                          ", Target Language: " + targetLanguage + 
-                          ", Source Language: " + sourceLanguage);
-        
+
+        log.debug("translateEmail user={} target={} source={} contentLen={}",
+                authenticatedUser, targetLanguage, sourceLanguage,
+                emailContent != null ? emailContent.length() : 0);
+
         String prompt = buildTranslationPrompt(emailContent,
                 sourceLanguage == null ? null : sourceLanguage.trim(),
                 targetLanguage.trim());
-        
-        System.out.println("Translation Prompt: " + prompt.substring(0, Math.min(200, prompt.length())) + "...");
-        
         return callGemini(prompt);
     }
 
-    public String sendEmail(EmailRequest emailRequest) {
-        if (mailFrom == null || mailFrom.isBlank()) {
-            throw new IllegalStateException("Sender email is not configured.");
+    public void sendEmail(EmailRequest emailRequest, String userId, String userEmail, String userName) {
+        if (userEmail == null || userEmail.isBlank()) {
+            throw new IllegalStateException("Authenticated user has no email claim; cannot send.");
         }
-
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailFrom);
-        message.setTo(emailRequest.getRecipientEmail());
-        message.setSubject(emailRequest.getEmailSubject());
-        message.setText(emailRequest.getMessageBody());
-
-        mailSender.send(message);
-        return "Email sent successfully.";
+        gmailApiService.send(userId, userEmail, userName,
+                emailRequest.getRecipientEmail(),
+                emailRequest.getEmailSubject(),
+                emailRequest.getMessageBody());
     }
 
     private String callGemini(String prompt) {
@@ -92,11 +85,9 @@ public class EmailGeneratorService {
             if (response == null) {
                 throw new RuntimeException("Empty response from Gemini API");
             }
-
             return extractResponseContent(response);
         } catch (Exception e) {
-            System.err.println("Gemini API Error: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Gemini API call failed: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to call Gemini API: " + e.getMessage(), e);
         }
     }
@@ -138,7 +129,7 @@ public class EmailGeneratorService {
 
             return parts.get(0).path("text").asText();
         } catch (Exception e) {
-            System.out.println("Error parsing response: " + e.getMessage());
+            log.warn("Failed to parse Gemini response: {}", e.getMessage());
             throw new RuntimeException("Failed to parse response", e);
         }
     }
@@ -148,12 +139,10 @@ public class EmailGeneratorService {
         if (tone == null || tone.isBlank()) {
             tone = "professional";
         }
-
         String emailContent = emailRequest.getEmailContent();
         if (emailContent == null) {
             emailContent = "";
         }
-
         return """
                 You are an intelligent email reply generator.
 
@@ -170,18 +159,16 @@ public class EmailGeneratorService {
 
     private String buildTranslationPrompt(String emailContent, String sourceLanguage, String targetLanguage) {
         String content = emailContent == null ? "" : emailContent;
-        
-        // Convert language codes to full names
         String targetLanguageName = convertLanguageCodeToName(targetLanguage);
         String sourceLanguageName = sourceLanguage != null ? convertLanguageCodeToName(sourceLanguage) : null;
-        
+
         String instruction;
         if (sourceLanguageName == null || sourceLanguageName.isBlank()) {
-            instruction = "Translate the following email into %s, automatically detecting the original language. Return only the translated text.";
-            instruction = instruction.formatted(targetLanguageName);
+            instruction = "Translate the following email into %s, automatically detecting the original language. Return only the translated text."
+                    .formatted(targetLanguageName);
         } else {
-            instruction = "Translate the following email from %s to %s, preserving tone and meaning. Return only the translated text.";
-            instruction = instruction.formatted(sourceLanguageName, targetLanguageName);
+            instruction = "Translate the following email from %s to %s, preserving tone and meaning. Return only the translated text."
+                    .formatted(sourceLanguageName, targetLanguageName);
         }
 
         return """
@@ -196,7 +183,6 @@ public class EmailGeneratorService {
         if (languageCode == null || languageCode.isBlank()) {
             return languageCode;
         }
-        
         return switch (languageCode.toLowerCase().trim()) {
             case "en" -> "English";
             case "hi" -> "Hindi";
@@ -208,7 +194,7 @@ public class EmailGeneratorService {
             case "pt" -> "Portuguese";
             case "ru" -> "Russian";
             case "ar" -> "Arabic";
-            default -> languageCode; // Return as-is if not recognized
+            default -> languageCode;
         };
     }
 }
