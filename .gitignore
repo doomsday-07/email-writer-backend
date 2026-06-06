@@ -1,0 +1,39 @@
+# Build output
+target/
+build/
+out/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.project
+.classpath
+.settings/
+.fleet/
+.zed/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Coverage / test reports
+coverage/
+.nyc_output/
+*.lcov
+test-output/
+
+# Maven local artifacts that shouldn't be in source control
+.mvn/wrapper/maven-wrapper.jar.bak
