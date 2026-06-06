@@ -1,0 +1,45 @@
+# Build artifacts — rebuilt inside the container
+target/
+build/
+out/
+*.jar
+*.war
+*.class
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never bake into the image
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Maven wrapper — not used inside the container
+.mvn/wrapper/
+mvnw
+mvnw.cmd
+
+# Test sources — skipped at build time
+src/test/
+
+# Docs / non-build files
+README.md
+HELP.md
+qodana.yaml
+.dockerignore
+Dockerfile
+docker-compose*.yml
