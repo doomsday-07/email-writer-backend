@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -17,7 +18,7 @@ import java.util.Base64;
 public class GmailApiService {
 
     private static final String GMAIL_SEND_URI =
-            "https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send";
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
     private static final long REFRESH_BUFFER_SECONDS = 300;
 
     private final RestClient restClient = RestClient.create();
@@ -30,13 +31,13 @@ public class GmailApiService {
                      String to,
                      String subject,
                      String body) {
-        String accessToken = getValidAccessToken(userId);
-        String raw = buildRfc2822(userEmail, userName, to, subject, body);
-        String encoded = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
-        String json = "{\"raw\":\"" + encoded + "\"}";
-
         try {
+            String accessToken = getValidAccessToken(userId);
+            String raw = buildRfc2822(userEmail, userName, to, subject, body);
+            String encoded = Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+            String json = "{\"raw\":\"" + encoded + "\"}";
+
             restClient.post()
                     .uri(GMAIL_SEND_URI)
                     .header("Authorization", "Bearer " + accessToken)
@@ -44,9 +45,14 @@ public class GmailApiService {
                     .body(json)
                     .retrieve()
                     .toBodilessEntity();
+        } catch (GmailNotConnectedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Gmail send failed for user={}", userId, e);
-            throw new RuntimeException("Failed to send email: " + e.getMessage(), e);
+            String msg = e instanceof RestClientException
+                    ? "Gmail API rejected the request: " + e.getMessage()
+                    : "Failed to send email: " + e.getMessage();
+            throw new RuntimeException(msg, e);
         }
     }
 

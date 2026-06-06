@@ -55,6 +55,13 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(400, "Bad Request", ex.getMessage(), req.getRequestURI()));
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(
+            IllegalStateException ex, HttpServletRequest req) {
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of(400, "Bad Request", ex.getMessage(), req.getRequestURI()));
+    }
+
     @ExceptionHandler(JacksonException.class)
     public ResponseEntity<ErrorResponse> handleJson(
             JacksonException ex, HttpServletRequest req) {
@@ -66,8 +73,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleGeneric(
             Exception ex, HttpServletRequest req) {
         log.error("Unhandled exception on {}", req.getRequestURI(), ex);
+        String message = ex instanceof RuntimeException && ex.getMessage() != null
+                ? ex.getMessage()
+                : "An unexpected error occurred";
         return ResponseEntity.internalServerError()
                 .body(ErrorResponse.of(500, "Internal Server Error",
-                        "An unexpected error occurred", req.getRequestURI()));
+                        message, req.getRequestURI()));
     }
 }

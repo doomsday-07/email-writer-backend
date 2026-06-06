@@ -16,14 +16,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class EmailGeneratorService {
 
     private final WebClient webClient;
-    private final String apiKey;
     private final ObjectMapper objectMapper;
     private final GmailApiService gmailApiService;
 
     public EmailGeneratorService(@Value("${gemini.api.url}") String baseUrl,
-                                 @Value("${gemini.api.key}") String geminiApiKey,
                                  GmailApiService gmailApiService) {
-        this.apiKey = geminiApiKey;
         this.webClient = WebClient.create(baseUrl);
         this.objectMapper = new ObjectMapper();
         this.gmailApiService = gmailApiService;
@@ -67,15 +64,17 @@ public class EmailGeneratorService {
     }
 
     private String callGemini(String prompt, String userApiKey) {
+        if (userApiKey == null || userApiKey.isBlank()) {
+            throw new IllegalArgumentException("Gemini API key is required. Use the Key button to add your own key.");
+        }
         String requestBody = createRequestBody(prompt);
-        String effectiveKey = (userApiKey != null && !userApiKey.isBlank()) ? userApiKey : apiKey;
 
         try {
             String response = webClient.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/v1beta/models/gemini-3-flash-preview:generateContent")
                             .build())
-                    .header("x-goog-api-key", effectiveKey)
+                    .header("x-goog-api-key", userApiKey)
                     .header("Content-Type", "application/json")
                     .header("Accept", "application/json")
                     .bodyValue(requestBody)

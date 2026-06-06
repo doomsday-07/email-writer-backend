@@ -54,11 +54,16 @@ public class GoogleTokenService {
         form.add("client_secret", clientSecret);
         form.add("grant_type", "refresh_token");
 
-        return restClient.post()
-                .uri("https://oauth2.googleapis.com/token")
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(form)
-                .retrieve()
-                .body(TokenResponse.class);
+        try {
+            return restClient.post()
+                    .uri("https://oauth2.googleapis.com/token")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(form)
+                    .retrieve()
+                    .body(TokenResponse.class);
+        } catch (Exception e) {
+            log.warn("Token refresh failed: {}", e.getMessage());
+            return null;
+        }
     }
 }
