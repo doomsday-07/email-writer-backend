@@ -1,14 +1,12 @@
 package com.email.writer;
 
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class EmailRequest {
 
-    @NotBlank(message = "emailContent must not be blank")
     @Size(max = 50_000, message = "emailContent must be <= 50000 chars")
     private String emailContent;
 
@@ -30,4 +28,7 @@ public class EmailRequest {
 
     @Size(max = 50_000, message = "messageBody must be <= 50000 chars")
     private String messageBody;
+
+    @Size(max = 200, message = "apiKey must be <= 200 chars")
+    private String apiKey;
 }

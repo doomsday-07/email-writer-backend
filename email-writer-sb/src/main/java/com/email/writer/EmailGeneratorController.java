@@ -22,6 +22,9 @@ public class EmailGeneratorController {
     public ResponseEntity<String> generateEmailReply(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody EmailRequest emailRequest) {
+        if (emailRequest.getEmailContent() == null || emailRequest.getEmailContent().isBlank()) {
+            throw new IllegalArgumentException("emailContent must not be blank");
+        }
         String email = jwt.getClaimAsString("email");
         String response = emailGeneratorService.generateEmailReply(emailRequest, email);
         return ResponseEntity.ok(response);
@@ -31,6 +34,9 @@ public class EmailGeneratorController {
     public ResponseEntity<String> translateEmail(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody EmailRequest emailRequest) {
+        if (emailRequest.getEmailContent() == null || emailRequest.getEmailContent().isBlank()) {
+            throw new IllegalArgumentException("emailContent must not be blank");
+        }
         if (emailRequest.getTargetLanguage() == null || emailRequest.getTargetLanguage().isBlank()) {
             throw new IllegalArgumentException("targetLanguage is required for translations.");
         }

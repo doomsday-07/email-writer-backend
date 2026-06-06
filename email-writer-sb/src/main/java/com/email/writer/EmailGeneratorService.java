@@ -35,7 +35,7 @@ public class EmailGeneratorService {
                 emailRequest.getTone(),
                 emailRequest.getEmailContent() != null ? emailRequest.getEmailContent().length() : 0);
         String prompt = buildReplyPrompt(emailRequest);
-        return callGemini(prompt);
+        return callGemini(prompt, emailRequest.getApiKey());
     }
 
     public String translateEmail(EmailRequest emailRequest, String authenticatedUser) {
@@ -53,7 +53,7 @@ public class EmailGeneratorService {
         String prompt = buildTranslationPrompt(emailContent,
                 sourceLanguage == null ? null : sourceLanguage.trim(),
                 targetLanguage.trim());
-        return callGemini(prompt);
+        return callGemini(prompt, emailRequest.getApiKey());
     }
 
     public void sendEmail(EmailRequest emailRequest, String userId, String userEmail, String userName) {
@@ -66,15 +66,16 @@ public class EmailGeneratorService {
                 emailRequest.getMessageBody());
     }
 
-    private String callGemini(String prompt) {
+    private String callGemini(String prompt, String userApiKey) {
         String requestBody = createRequestBody(prompt);
+        String effectiveKey = (userApiKey != null && !userApiKey.isBlank()) ? userApiKey : apiKey;
 
         try {
             String response = webClient.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/v1beta/models/gemini-3-flash-preview:generateContent")
                             .build())
-                    .header("x-goog-api-key", apiKey)
+                    .header("x-goog-api-key", effectiveKey)
                     .header("Content-Type", "application/json")
                     .header("Accept", "application/json")
                     .bodyValue(requestBody)
