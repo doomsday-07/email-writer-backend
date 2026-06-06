@@ -1,20 +1,16 @@
 services:
   - type: web
     name: email-writer-backend
-    runtime: java
+    runtime: docker
     plan: starter
     region: oregon
     branch: main
     rootDir: email-writer-sb
-    buildCommand: ./mvnw -B -DskipTests package
-    startCommand: java -Xms256m -Xmx512m -jar target/email-writer-sb-0.0.1-SNAPSHOT.jar
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /actuator/health
-    autoDeploy: true
+    autoDeployTrigger: commit
     envVars:
-      - key: JAVA_VERSION
-        value: 25
-      - key: SERVER_PORT
-        value: 10000
       - key: DATABASE_URL
         fromDatabase:
           name: email-writer-db
@@ -23,8 +19,6 @@ services:
         value: org.postgresql.Driver
       - key: DATABASE_DIALECT
         value: org.hibernate.dialect.PostgreSQLDialect
-      - key: SPRING_PROFILES_ACTIVE
-        value: prod
       - key: GEMINI_API_URL
         sync: false
       - key: GEMINI_API_KEY
@@ -42,13 +36,11 @@ services:
       - key: RATE_LIMIT_REFILL_PER_MINUTE
         value: 60
 
-  - type: pserv
-    name: email-writer-db
-    plan: starter
+databases:
+  - name: email-writer-db
+    plan: free
     region: oregon
     databaseName: email_writer
-    databaseUser: email_writer
+    user: email_writer
+    postgresMajorVersion: "16"
     ipAllowList: []
-    # Allow only the backend service to connect by source: render keeps this
-    # open by default; you can restrict to the web service's outbound IP later.
-    version: "16"

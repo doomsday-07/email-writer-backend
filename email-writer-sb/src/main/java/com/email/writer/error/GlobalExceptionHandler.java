@@ -1,6 +1,6 @@
 package com.email.writer.error;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import tools.jackson.core.JacksonException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -55,9 +55,9 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(400, "Bad Request", ex.getMessage(), req.getRequestURI()));
     }
 
-    @ExceptionHandler(JsonProcessingException.class)
+    @ExceptionHandler(JacksonException.class)
     public ResponseEntity<ErrorResponse> handleJson(
-            JsonProcessingException ex, HttpServletRequest req) {
+            JacksonException ex, HttpServletRequest req) {
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of(400, "Bad Request", "Malformed JSON", req.getRequestURI()));
     }

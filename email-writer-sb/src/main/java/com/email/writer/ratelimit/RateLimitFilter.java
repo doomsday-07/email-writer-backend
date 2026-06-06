@@ -1,7 +1,7 @@
 package com.email.writer.ratelimit;
 
 import com.email.writer.error.ErrorResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
