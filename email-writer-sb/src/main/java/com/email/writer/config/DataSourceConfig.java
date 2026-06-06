@@ -16,7 +16,7 @@ public class DataSourceConfig {
     @Primary
     public DataSource dataSource(DataSourceProperties props) {
         String url = props.getUrl();
-        if (url != null && url.startsWith("postgres://")) {
+        if (url != null && (url.startsWith("postgres://") || url.startsWith("postgresql://"))) {
             URI uri = URI.create(url);
             String userInfo = uri.getUserInfo();
             String host = uri.getHost();
