@@ -64,6 +64,13 @@ public class OAuthController {
         return ResponseEntity.ok(new StatusResponse(true));
     }
 
+    @PostMapping("/disconnect")
+    public ResponseEntity<StatusResponse> disconnect(@AuthenticationPrincipal Jwt jwt) {
+        String userId = jwt.getSubject();
+        repository.deleteById(userId);
+        return ResponseEntity.ok(new StatusResponse(false));
+    }
+
     @GetMapping("/status")
     public ResponseEntity<StatusResponse> status(@AuthenticationPrincipal Jwt jwt) {
         String userId = jwt.getSubject();
