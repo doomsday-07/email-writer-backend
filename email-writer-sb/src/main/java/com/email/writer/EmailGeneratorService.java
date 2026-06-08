@@ -6,6 +6,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -61,6 +62,23 @@ public class EmailGeneratorService {
                 emailRequest.getRecipientEmail(),
                 emailRequest.getEmailSubject(),
                 emailRequest.getMessageBody());
+    }
+
+    public void sendEmailWithAttachments(EmailRequest emailRequest, String userId,
+                                          String userEmail, String userName,
+                                          List<Attachment> attachments) {
+        if (userEmail == null || userEmail.isBlank()) {
+            throw new IllegalStateException("Authenticated user has no email claim; cannot send.");
+        }
+        if (attachments == null || attachments.isEmpty()) {
+            sendEmail(emailRequest, userId, userEmail, userName);
+            return;
+        }
+        gmailApiService.sendWithAttachments(userId, userEmail, userName,
+                emailRequest.getRecipientEmail(),
+                emailRequest.getEmailSubject(),
+                emailRequest.getMessageBody(),
+                attachments);
     }
 
     private String callGemini(String prompt, String userApiKey) {

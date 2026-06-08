@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -136,6 +137,60 @@ public class EmailGeneratorController {
             throw new GmailNotConnectedException("Authenticated user has no email claim.");
         }
         emailGeneratorService.sendEmail(emailRequest, userId, email, name);
+        return ResponseEntity.ok("Email sent successfully.");
+    }
+
+    @PostMapping(value = "/send-with-attachments", consumes = "multipart/form-data")
+    public ResponseEntity<String> sendEmailWithAttachments(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam("recipientEmail") String recipientEmail,
+            @RequestParam("emailSubject") String emailSubject,
+            @RequestParam("messageBody") String messageBody,
+            @RequestParam(value = "emailContent", required = false) String emailContent,
+            @RequestParam(value = "apiKey", required = false) String apiKey,
+            @RequestParam(value = "files", required = false) List<org.springframework.web.multipart.MultipartFile> files) {
+
+        if (recipientEmail == null || recipientEmail.isBlank()) {
+            throw new IllegalArgumentException("recipientEmail is required for sending.");
+        }
+        if (emailSubject == null || emailSubject.isBlank()) {
+            throw new IllegalArgumentException("emailSubject is required for sending.");
+        }
+        if (messageBody == null || messageBody.isBlank()) {
+            throw new IllegalArgumentException("messageBody is required for sending.");
+        }
+
+        String userId = jwt.getSubject();
+        String email = jwt.getClaimAsString("email");
+        String name = jwt.getClaimAsString("name");
+        if (email == null) {
+            throw new GmailNotConnectedException("Authenticated user has no email claim.");
+        }
+
+        EmailRequest emailRequest = new EmailRequest();
+        emailRequest.setRecipientEmail(recipientEmail);
+        emailRequest.setEmailSubject(emailSubject);
+        emailRequest.setMessageBody(messageBody);
+        emailRequest.setEmailContent(emailContent);
+        emailRequest.setApiKey(apiKey);
+
+        List<Attachment> attachments = new ArrayList<>();
+        if (files != null) {
+            for (org.springframework.web.multipart.MultipartFile file : files) {
+                if (!file.isEmpty()) {
+                    try {
+                        attachments.add(new Attachment(
+                                file.getOriginalFilename(),
+                                file.getContentType(),
+                                file.getBytes()));
+                    } catch (java.io.IOException e) {
+                        throw new RuntimeException("Failed to read uploaded file: " + e.getMessage());
+                    }
+                }
+            }
+        }
+
+        emailGeneratorService.sendEmailWithAttachments(emailRequest, userId, email, name, attachments);
         return ResponseEntity.ok("Email sent successfully.");
     }
 }

@@ -10,6 +10,16 @@ import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import jakarta.activation.DataHandler;
+import jakarta.mail.Message;
+import jakarta.mail.Multipart;
+import jakarta.mail.Session;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeBodyPart;
+import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.internet.MimeMultipart;
+import jakarta.mail.util.ByteArrayDataSource;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.net.URLEncoder;
@@ -18,6 +28,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 @Service
 @RequiredArgsConstructor
@@ -125,6 +136,66 @@ public class GmailApiService {
         } catch (Exception e) {
             log.error("Failed to get Gmail message {} for user={}", messageId, userId, e);
             throw new RuntimeException("Failed to fetch email: " + e.getMessage(), e);
+        }
+    }
+
+    public void sendWithAttachments(String userId,
+                                     String userEmail,
+                                     String userName,
+                                     String to,
+                                     String subject,
+                                     String body,
+                                     List<com.email.writer.Attachment> attachments) {
+        try {
+            String accessToken = getValidAccessToken(userId);
+
+            Session session = Session.getDefaultInstance(new Properties());
+            MimeMessage mimeMessage = new MimeMessage(session);
+
+            String from = (userName == null || userName.isBlank())
+                    ? userEmail
+                    : "\"" + userName.replace("\"", "\\\"") + "\" <" + userEmail + ">";
+            mimeMessage.setFrom(new InternetAddress(from));
+            mimeMessage.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
+            mimeMessage.setSubject(subject, "UTF-8");
+
+            Multipart multipart = new MimeMultipart("mixed");
+
+            MimeBodyPart textPart = new MimeBodyPart();
+            textPart.setText(body, "UTF-8");
+            multipart.addBodyPart(textPart);
+
+            for (com.email.writer.Attachment att : attachments) {
+                MimeBodyPart attachPart = new MimeBodyPart();
+                attachPart.setFileName(att.filename());
+                attachPart.setDataHandler(new DataHandler(
+                        new ByteArrayDataSource(att.bytes(), att.contentType())));
+                multipart.addBodyPart(attachPart);
+            }
+
+            mimeMessage.setContent(multipart);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            mimeMessage.writeTo(baos);
+            String encoded = Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(baos.toByteArray());
+            String json = "{\"raw\":\"" + encoded + "\"}";
+
+            restClient.post()
+                    .uri(GMAIL_SEND_URI)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(json)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (GmailNotConnectedException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Gmail send with attachments failed for user={}", userId, e);
+            String msg = e instanceof RestClientException
+                    ? "Gmail API rejected the request: " + e.getMessage()
+                    : "Failed to send email with attachments: " + e.getMessage();
+            throw new RuntimeException(msg, e);
         }
     }
 
